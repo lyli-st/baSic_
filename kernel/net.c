@@ -7,6 +7,7 @@
  */
 #include "net.h"
 #include "e1000.h"
+#include "timer.h"
 #include "../lib/string.h"
 #include "../lib/kprintf.h"
 
@@ -24,11 +25,6 @@ typedef struct {
 static arp_entry_t arp_cache[ARP_CACHE_SIZE];
 
 static u16 htons(u16 v) { return (u16)((v >> 8) | (v << 8)); }
-static u32 htonl(u32 v)
-{
-    return ((v & 0xFF) << 24) | (((v >> 8) & 0xFF) << 16)
-         | (((v >> 16) & 0xFF) << 8) | ((v >> 24) & 0xFF);
-}
 
 static u16 ip_checksum(void *data, u32 len)
 {
@@ -185,7 +181,7 @@ int net_arp_request(u8 ip[4])
     kprintf("[net] ARP request -> %d.%d.%d.%d\n",
             ip[0], ip[1], ip[2], ip[3]);
 
-    extern void timer_sleep(u32 ms);
+    
     for (int i = 0; i < 50; i++) {
         net_poll();
         u8 *mac = arp_cache_get(ip);
