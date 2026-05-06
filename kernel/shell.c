@@ -28,6 +28,7 @@
 #include "watchdog.h"
 #include "elf.h"
 #include "e1000.h"
+#include "net.h"
 #include "../mm/pmm.h"
 #include "../fs/vfs.h"
 #include "../fs/ramfs.h"
@@ -377,7 +378,7 @@ static void tab_complete(void)
         "uptime","time","mem","sysinfo","dmesg","top","ps","kill","spawn",
         "history","pwd","cd","ls","cat","write","mkdir","find","grep",
         "diskls","diskcat","diskwrite","diskdel","disksync","chmod",
-        "touch","rm","mv","cp","wc","head","tail","netinfo",
+        "touch","rm","mv","cp","wc","head","tail","netinfo","arp","ping",
         "edit","shoot","about","reboot","halt", NULL
     };
     cmd_buf[cmd_len] = '\0';
@@ -415,7 +416,7 @@ static void cmd_help(void)
     shell_puts("  display  : color", VGA_COLOR_LIGHT_GREY);
     shell_puts("  nav      : pwd cd ls", VGA_COLOR_LIGHT_GREY);
     shell_puts("  files    : cat write mkdir find grep edit touch rm mv cp wc head tail", VGA_COLOR_LIGHT_GREY);
-    shell_puts("  net      : netinfo", VGA_COLOR_LIGHT_GREY);
+    shell_puts("  net      : netinfo arp ping", VGA_COLOR_LIGHT_GREY);
     shell_puts("  script   : run", VGA_COLOR_LIGHT_GREY);
     shell_puts("  disk     : diskls diskcat diskwrite diskdel disksync chmod", VGA_COLOR_LIGHT_GREY);
     shell_puts("  fun      : shoot", VGA_COLOR_LIGHT_CYAN);
@@ -1092,6 +1093,37 @@ static void cmd_netinfo(void)
     shell_newline();
 }
 
+static void cmd_arp(const char *ip_str)
+{
+    if (!ip_str||!*ip_str) { shell_puts("usage: arp <ip>", VGA_COLOR_LIGHT_RED); shell_newline(); return; }
+    u8 ip[4] = {10,0,2,2};  /* default to gateway */
+    /* thats how: a.b.c.d */
+    int i = 0; u8 v = 0;
+    const char *p = ip_str;
+    while (*p && i < 4) {
+        if (*p >= '0' && *p <= '9') { v = v * 10 + (*p - '0'); }
+        else if (*p == '.') { ip[i++] = v; v = 0; }
+        p++;
+    }
+    if (i < 4) ip[i] = v;
+    net_arp_request(ip);
+}
+
+static void cmd_ping(const char *ip_str)
+{
+    if (!ip_str||!*ip_str) { shell_puts("usage: ping <ip>", VGA_COLOR_LIGHT_RED); shell_newline(); return; }
+    u8 ip[4] = {10,0,2,2};
+    int i = 0; u8 v = 0;
+    const char *p = ip_str;
+    while (*p && i < 4) {
+        if (*p >= '0' && *p <= '9') { v = v * 10 + (*p - '0'); }
+        else if (*p == '.') { ip[i++] = v; v = 0; }
+        p++;
+    }
+    if (i < 4) ip[i] = v;
+    net_ping(ip);
+}
+
 static void cmd_reboot(void)
 {
     history_save();
@@ -1218,6 +1250,8 @@ static void dispatch(void)
     if (!strncmp(cmd_buf,"head ", 5)) { cmd_head(cmd_buf+5, 10);       return; }
     if (!strncmp(cmd_buf,"tail ", 5)) { cmd_tail(cmd_buf+5, 10);       return; }
 
+    if (!strncmp(cmd_buf,"arp ",    4)) { cmd_arp(cmd_buf+4);     return; }
+    if (!strncmp(cmd_buf,"ping ",   5)) { cmd_ping(cmd_buf+5);    return; }
     if (!strncmp(cmd_buf,"run ",    4)) { cmd_run(cmd_buf+4);     return; }
     if (!strncmp(cmd_buf,"touch ",  6)) { cmd_touch(cmd_buf+6);   return; }
     if (!strncmp(cmd_buf,"rm ",     3)) { cmd_rm(cmd_buf+3);      return; }
