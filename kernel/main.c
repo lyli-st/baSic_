@@ -31,6 +31,7 @@
 #include "tss.h"
 #include "pci.h"
 #include "e1000.h"
+#include "net.h"
 #include "userspace.h"
 #include "../mm/pmm.h"
 #include "../mm/vmm.h"
@@ -77,6 +78,7 @@ void kmain(void)
     disk_init();
     pci_init();
     e1000_init();
+    net_init();
     if (fat12_init())
         disksync_run_init();
 
