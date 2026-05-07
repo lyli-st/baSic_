@@ -379,6 +379,7 @@ static void tab_complete(void)
         "history","pwd","cd","ls","cat","write","mkdir","find","grep",
         "diskls","diskcat","diskwrite","diskdel","disksync","chmod",
         "touch","rm","mv","cp","wc","head","tail","netinfo","arp","ping",
+        "udpsend",
         "edit","shoot","about","reboot","halt", NULL
     };
     cmd_buf[cmd_len] = '\0';
@@ -416,7 +417,7 @@ static void cmd_help(void)
     shell_puts("  display  : color", VGA_COLOR_LIGHT_GREY);
     shell_puts("  nav      : pwd cd ls", VGA_COLOR_LIGHT_GREY);
     shell_puts("  files    : cat write mkdir find grep edit touch rm mv cp wc head tail", VGA_COLOR_LIGHT_GREY);
-    shell_puts("  net      : netinfo arp ping", VGA_COLOR_LIGHT_GREY);
+    shell_puts("  net      : netinfo arp ping udpsend", VGA_COLOR_LIGHT_GREY);
     shell_puts("  script   : run", VGA_COLOR_LIGHT_GREY);
     shell_puts("  disk     : diskls diskcat diskwrite diskdel disksync chmod", VGA_COLOR_LIGHT_GREY);
     shell_puts("  fun      : shoot", VGA_COLOR_LIGHT_CYAN);
@@ -1124,6 +1125,38 @@ static void cmd_ping(const char *ip_str)
     net_ping(ip);
 }
 
+/** patch udp to shell to work on, "will be a bit experimental for testting at this moment. I will update soon." */
+static void cmd_udpsend(const char *arg)
+{
+    if (!arg||!*arg) {
+        shell_puts("usage: udpsend <ip> <port> <msg>", VGA_COLOR_LIGHT_RED);
+        shell_newline(); return;
+    }
+    /* parse ips */
+    u8 ip[4] = {10,0,2,2}; int i=0; u8 v=0; /* as u see local QEMU */
+    const char *p = arg;
+    while (*p && *p != ' ' && i < 4) {
+        if (*p>='0'&&*p<='9') v=v*10+(*p-'0');
+        else if (*p=='.') { ip[i++]=v; v=0; }
+        p++;
+    }
+    if (i<4) ip[i]=v;
+    while (*p==' ') p++;
+
+    /* parse port */
+    u16 port = 0;
+    while (*p>='0'&&*p<='9') { port=port*10+(*p-'0'); p++; }
+    while (*p==' ') p++;
+
+    if (!*p) {
+        shell_puts("udpsend: missing message", VGA_COLOR_LIGHT_RED);
+        shell_newline(); return;
+    }
+
+    net_udp_send(ip, port, 12345, (const u8*)p, (u16)strlen(p));
+    shell_puts("OK", VGA_COLOR_LIGHT_GREEN); shell_newline();
+}
+
 static void cmd_reboot(void)
 {
     history_save();
@@ -1250,6 +1283,7 @@ static void dispatch(void)
     if (!strncmp(cmd_buf,"head ", 5)) { cmd_head(cmd_buf+5, 10);       return; }
     if (!strncmp(cmd_buf,"tail ", 5)) { cmd_tail(cmd_buf+5, 10);       return; }
 
+    if (!strncmp(cmd_buf,"udpsend ",8)) { cmd_udpsend(cmd_buf+8); return; }
     if (!strncmp(cmd_buf,"arp ",    4)) { cmd_arp(cmd_buf+4);     return; }
     if (!strncmp(cmd_buf,"ping ",   5)) { cmd_ping(cmd_buf+5);    return; }
     if (!strncmp(cmd_buf,"run ",    4)) { cmd_run(cmd_buf+4);     return; }
