@@ -204,6 +204,57 @@ void net_poll(void)
     }
 }
 
+int net_udp_send(u8 dst_ip[4], u16 dst_port, u16 src_port,
+                 const u8 *data, u16 len)
+{
+    if (len > UDP_MAX_PAYLOAD) return -1;
+
+    /** here we have to resolve the ARP first */
+    u8 *dst_mac = arp_cache_get(dst_ip);
+    if (!dst_mac) {
+        if (!net_arp_request(dst_ip)) return -1;
+        dst_mac = arp_cache_get(dst_ip);
+        if (!dst_mac) return -1;
+    }
+
+    u16 udp_len = sizeof(udp_hdr_t) + len;
+    u16 ip_len  = sizeof(ip_hdr_t) + udp_len;
+    u16 total   = sizeof(eth_hdr_t) + ip_len;
+
+    u8 pkt[sizeof(eth_hdr_t) + sizeof(ip_hdr_t) +
+           sizeof(udp_hdr_t) + UDP_MAX_PAYLOAD];
+    memset(pkt, 0, sizeof(pkt));
+
+    eth_hdr_t *eth = (eth_hdr_t *)pkt;
+    ip_hdr_t  *iph = (ip_hdr_t  *)(pkt + sizeof(eth_hdr_t));
+    udp_hdr_t *udp = (udp_hdr_t *)(pkt + sizeof(eth_hdr_t) + sizeof(ip_hdr_t));
+    u8 *payload    = (u8 *)(udp + 1);
+
+    memcpy(eth->dst, dst_mac, 6);
+    memcpy(eth->src, my_mac,  6);
+    eth->type = htons(ETH_TYPE_IP);
+
+    iph->ihl_ver   = 0x45;
+    iph->ttl       = 64;
+    iph->proto     = IP_PROTO_UDP;
+    iph->total_len = htons(ip_len);
+    memcpy(iph->src, my_ip,  4);
+    memcpy(iph->dst, dst_ip, 4);
+    iph->checksum  = ip_checksum(iph, sizeof(ip_hdr_t));
+
+    udp->src_port = htons(src_port);
+    udp->dst_port = htons(dst_port);
+    udp->length   = htons(udp_len);
+    udp->checksum = 0;  /* totaly optional - just for IPv4 */
+    memcpy(payload, data, len);
+
+    e1000_send(pkt, total);
+    kprintf("[net] UDP sent to %d.%d.%d.%d:%d (%d bytes)\n",
+            dst_ip[0], dst_ip[1], dst_ip[2], dst_ip[3],
+            dst_port, len);
+    return (int)len;
+}
+
 int net_arp_request(u8 ip[4])
 {
     u8 pkt[sizeof(eth_hdr_t) + sizeof(arp_pkt_t)];
@@ -290,7 +341,8 @@ int net_ping(u8 ip[4])
 
 void net_init(void)
 {
-    memset(arp_cache, 0, sizeof(arp_cache));
+    memset(arp_cache,   0, sizeof(arp_cache));
+    memset(udp_handlers, 0, sizeof(udp_handlers));
     e1000_get_mac(my_mac);
     kprintf("[OK] net: stack ready — IP %d.%d.%d.%d\n",
             my_ip[0], my_ip[1], my_ip[2], my_ip[3]);
