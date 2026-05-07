@@ -22,9 +22,35 @@ typedef struct {
     u8 mac[6];
     u8 valid;
 } arp_entry_t;
+
+/* UDP port handler table */
+#define UDP_HANDLERS_MAX  8
+typedef struct {
+    u16           port;
+    udp_handler_t handler;
+    u8            used;
+} udp_port_entry_t;
+
 static arp_entry_t arp_cache[ARP_CACHE_SIZE];
 
 static u16 htons(u16 v) { return (u16)((v >> 8) | (v << 8)); }
+
+static udp_port_entry_t udp_handlers[UDP_HANDLERS_MAX];
+
+void net_udp_register(u16 port, udp_handler_t handler)
+{
+    for (int i = 0; i < UDP_HANDLERS_MAX; i++) {
+        if (!udp_handlers[i].used) {
+            udp_handlers[i].port    = port;
+            udp_handlers[i].handler = handler;
+            udp_handlers[i].used    = 1;
+            kprintf("[net] UDP port %d registered\n", port);
+            return;
+        }
+    }
+    kprintf("[WARN] net: UDP handler table full\n");
+}
+
 
 static u16 ip_checksum(void *data, u32 len)
 {
@@ -137,11 +163,33 @@ static void handle_icmp(u8 *pkt, u16 len)
     kprintf("[net] ping reply sent\n");
 }
 
+static void handle_udp(u8 *pkt, u16 len)
+{
+    ip_hdr_t  *ip  = (ip_hdr_t  *)(pkt + sizeof(eth_hdr_t));
+    udp_hdr_t *udp = (udp_hdr_t *)(pkt + sizeof(eth_hdr_t) + sizeof(ip_hdr_t));
+
+    u16 dst_port = htons(udp->dst_port);
+    u16 src_port = htons(udp->src_port);
+    u8 *payload  = (u8 *)(udp + 1);
+    u16 pay_len  = htons(udp->length) - sizeof(udp_hdr_t);
+
+    if (pay_len > len) return;
+
+    for (int i = 0; i < UDP_HANDLERS_MAX; i++) {
+        if (udp_handlers[i].used && udp_handlers[i].port == dst_port) {
+            udp_handlers[i].handler(payload, pay_len, ip->src, src_port);
+            return;
+        }
+    }
+    kprintf("[net] UDP port %d unhandled\n", dst_port);
+}
+
 static void handle_ip(u8 *pkt, u16 len)
 {
     ip_hdr_t *ip = (ip_hdr_t *)(pkt + sizeof(eth_hdr_t));
     if (memcmp(ip->dst, my_ip, 4) != 0) return;
     if (ip->proto == IP_PROTO_ICMP) handle_icmp(pkt, len);
+    if (ip->proto == IP_PROTO_UDP)  handle_udp(pkt, len);
 }
 
 void net_poll(void)

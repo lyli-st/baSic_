@@ -64,6 +64,23 @@ typedef struct __attribute__((packed)) {
     u16 seq;
 } icmp_hdr_t;
 
+/* UDP utils
+** what it does: UDP packets
+* handling: send data, register callbacks, 
+** process packets.
+ */
+typedef struct __attribute__((packed)) {
+    u16 src_port;
+    u16 dst_port;
+    u16 length;
+    u16 checksum;
+} udp_hdr_t;
+
+typedef void (*udp_handler_t)(u8 *data, u16 len, u8 src_ip[4], u16 src_port);
+
+
+
+
 /* 10.0.2.15 */
 #define MY_IP0  10
 #define MY_IP1   0
@@ -75,9 +92,14 @@ typedef struct __attribute__((packed)) {
 #define GW_IP2   2
 #define GW_IP3   2
 
+#define UDP_MAX_PAYLOAD  512
+
 void net_init(void);
 void net_poll(void);
 int  net_arp_request(u8 ip[4]);
 int  net_ping(u8 ip[4]);
+int  net_udp_send(u8 dst_ip[4], u16 dst_port, u16 src_port,
+                  const u8 *data, u16 len);
+void net_udp_register(u16 port, udp_handler_t handler);
 
 #endif
