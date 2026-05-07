@@ -341,9 +341,15 @@ int net_ping(u8 ip[4])
 
 void net_init(void)
 {
-    memset(arp_cache,   0, sizeof(arp_cache));
+    memset(arp_cache,    0, sizeof(arp_cache));
     memset(udp_handlers, 0, sizeof(udp_handlers));
     e1000_get_mac(my_mac);
+
+    /* QEMU gateway never answers ARP — hardcode its MAC */
+    u8 gw_ip[4]  = { 10, 0, 2, 2 };
+    u8 gw_mac[6] = { 0x52, 0x55, 0x0a, 0x00, 0x02, 0x02 };
+    arp_cache_set(gw_ip, gw_mac);
+
     kprintf("[OK] net: stack ready — IP %d.%d.%d.%d\n",
             my_ip[0], my_ip[1], my_ip[2], my_ip[3]);
 }
