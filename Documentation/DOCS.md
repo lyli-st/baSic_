@@ -338,6 +338,9 @@ PCI config space accessed via ports 0xCF8 (address) and 0xCFC (data).
 
 ### Network (e1000)
 
+UDP: net_udp_send() builds ethernet+IP+UDP frame, resolves ARP if needed, sends via e1000. handle_udp() dispatches incoming UDP packets to registered port handlers via 
+net_udp_register(port, fn). 8 port handler slots. UDP checksum left as zero (valid for IPv4). udpsend shell command for testing.
+
 
 ### Commands
 
