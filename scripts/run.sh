@@ -32,5 +32,8 @@ if [ "$MODE" = "debug" ]; then
     echo "[INFO] In another terminal: gdb -ex 'target remote :1234'"
 fi
 
+# in case the disk is not added manually, itll help to add the disk before run(if the disk isnt added). 
+# i tried to do it inside makefile, but giving me errors every time. so added here
+[ -f disk.img ] || dd if=/dev/zero of=disk.img bs=512 count=2880
 echo "[RUN] qemu-system-i386 ${QEMU_ARGS[*]}"
 exec qemu-system-i386 "${QEMU_ARGS[@]}"
