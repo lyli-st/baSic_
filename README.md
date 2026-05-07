@@ -5,8 +5,10 @@ x86 kernel built from scratch in C and assembly.
 ## Build & Run
 
 ```bash
-# cross-compiler is recommended else go with gcc -m32
-sudo apt install nasm qemu-system-x86 gcc-multilib 
+# cross-compiler is recommended 
+sudo apt install nasm qemu-system-x86 
+# prebuilt cross toolchain(for some PCs)
+sudo apt install gcc-i686-linux-gnu
 make run
 ```
 
