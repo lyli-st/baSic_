@@ -5,9 +5,9 @@ CC      := i686-elf-gcc
 LD      := i686-elf-ld
 
 ifeq (, $(shell which $(CC) 2>/dev/null))
-    CC  := gcc
-    LD  := ld
-    $(warning Cross-compiler not found, using host gcc -m32.)
+    CC  := i686-linux-gnu-gcc
+    LD  := i686-linux-gnu-ld
+    $(warning Cross-compiler not found, using i686-linux-gnu-gcc.)
 endif
 
 ASFLAGS := -f elf32
