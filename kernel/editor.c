@@ -25,6 +25,7 @@
 #include "vga.h"
 #include "keyboard.h"
 #include "timer.h"
+#include "terminal.h"
 #include "../fs/vfs.h"
 #include "../fs/ramfs.h"
 #include "../lib/string.h"
@@ -391,7 +392,6 @@ void editor_open(const char *path)
     filename[127] = '\0';
     load_file(path);
 
-    /* clear screen */
     for (int r = 0; r < VGA_H; r++)
         for (int c = 0; c < VGA_W; c++)
             ed_put(c, r, ' ', VGA_COLOR_BLACK, VGA_COLOR_BLACK);
@@ -399,12 +399,39 @@ void editor_open(const char *path)
     render_all();
 
     for (;;) {
-        char c = keyboard_getchar();
-        if (!c) {
-            __asm__ volatile ("hlt");
-            continue;
+        term_event_t ev = term_poll();
+        if (ev.type == TERM_NONE) {
+            char c = keyboard_getchar();
+            if (!c) { __asm__ volatile ("hlt"); continue; }
+            ev.type = TERM_CHAR;
+            ev.ch   = c;
         }
 
+        /* arrow keys */
+        if (ev.type == TERM_UP) {
+            if (cy > 0) { cy--; if (cx > line_len[cy]) cx = line_len[cy]; }
+            goto redraw;
+        }
+        if (ev.type == TERM_DOWN) {
+            if (cy < num_lines - 1) { cy++; if (cx > line_len[cy]) cx = line_len[cy]; }
+            goto redraw;
+        }
+        if (ev.type == TERM_LEFT) {
+            if (cx > 0) cx--;
+            else if (cy > 0) { cy--; cx = line_len[cy]; }
+            goto redraw;
+        }
+        if (ev.type == TERM_RIGHT) {
+            if (cx < line_len[cy]) cx++;
+            else if (cy < num_lines - 1) { cy++; cx = 0; }
+            goto redraw;
+        }
+        if (ev.type == TERM_HOME) { cx = 0;            goto redraw; }
+        if (ev.type == TERM_END)  { cx = line_len[cy]; goto redraw; }
+
+        if (ev.type != TERM_CHAR) continue;
+
+        char c = ev.ch;
         /* Ctrl keys */
         if (c == 'q' - 96) break;                          /* Ctrl-Q: quit */
 
@@ -418,29 +445,13 @@ void editor_open(const char *path)
         if (c == 'a' - 96) { cx = 0;            goto redraw; } /* Ctrl-A home */
         if (c == 'e' - 96) { cx = line_len[cy]; goto redraw; } /* Ctrl-E end  */
 
-        if (c == '\n') { buf_newline(); goto redraw; }
+        if (c == '\n') { buf_newline();    goto redraw; }
         if (c == '\b') { buf_delete_char(); goto redraw; }
 
         /* printable ASCII */
-        if (c >= 32 && c < 127) {
-            buf_insert_char(c);
-            goto redraw;
-        }
-
-        /* movement via WASD since we don't decode escape sequences yet */
-        if (c == 'w' - 96 || c == 'W') {    /* up */
-            if (cy > 0) {
-                cy--;
-                if (cx > line_len[cy]) cx = line_len[cy];
-            }
-            goto redraw;
-        }
-        if (c == 's' - 96) {                 /* down (Ctrl-S handled above) */
-            if (cy < num_lines - 1) {
-                cy++;
-                if (cx > line_len[cy]) cx = line_len[cy];
-            }
-            goto redraw;
+        if (c >= 32 && c < 127) { 
+            buf_insert_char(c); 
+            goto redraw; 
         }
 
         continue;
@@ -450,7 +461,6 @@ redraw:
         render_all();
     }
 
-    /* if modified and not saved, prompt */
     if (modified) {
         ed_fill_row(ROW_MSG, ' ', VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
         ed_str(1, ROW_MSG, "unsaved changes! save? (y/n)",
