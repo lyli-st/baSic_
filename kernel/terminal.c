@@ -59,25 +59,12 @@ term_event_t term_poll(void)
 {
     term_event_t ev = { TERM_NONE, 0 };
 
-    /* check if keyboard has data */
-    u8 status = inb_p(0x64);
-    if (!(status & 0x01)) return ev;
-
-    u8 sc = inb_p(KBD_DATA_PORT);
-
-    if (sc == 0xE0) {
-        /* next byte is extended scancode read it */
-        int timeout = 10000;
-        while (!(inb_p(0x64) & 0x01) && --timeout);
-        if (!timeout) return ev;
-        u8 ext = inb_p(KBD_DATA_PORT);
-        if (ext & 0x80) return ev;  
+    /* check extended key first — set by IRQ handler on 0xE0 prefix */
+    u8 ext = keyboard_get_ext();
+    if (ext) {
         ev.type = decode_ext(ext);
         return ev;
     }
-
-    /* key release */
-    if (sc & 0x80) return ev;
 
     /* regular key — let keyboard.c handle it via its IRQ path
      * but we need to avoid double-reading; use keyboard_getchar() instead */
