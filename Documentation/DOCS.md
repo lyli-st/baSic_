@@ -9,7 +9,7 @@
 
 ## Overview
 
-baSic_ is an original operating system written from scratch in C and x86 Assembly. It boots from bare metal via a custom MBR bootloader, transitions to 32-bit protected mode through a hand-built GDT, and runs a kernel with memory management, interrupt-driven devices, a virtual filesystem, process scheduler, syscall interface, and an interactive shell.
+baSic_ an x86 system. Rn it sits somewhere between a kernel and a full OS, as you see the shell, editor, and utilities run in ring 0 alongside the kernel, which is architecturally WRONG and i know it. the plan is to eventually split it properly: kernel in one repo, userspace in another, with the shell and tools rebuilt as ring 3 ELF binaries talking to the kernel via syscalls. but that split requires a stable kernel first, so for now and most importantly PEace of My Mnd. everything lives together while the foundations get built out and Im done.
 
 ---
 
