@@ -14,5 +14,6 @@ void keyboard_init(void);
 
 /* returns the last ASCII character typed, or 0 if none */
 char keyboard_getchar(void);
+u8 keyboard_get_ext(void);
 
 #endif

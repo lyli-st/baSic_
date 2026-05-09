@@ -47,6 +47,8 @@ static const char sc_ascii_shift[] = {
 static volatile char last_char = 0;
 static int shift_held = 0;
 static int ctrl_held  = 0;
+static volatile u8   ext_pending = 0;
+static volatile u8   last_ext_sc = 0;
 
 static inline u8 inb(u16 port)
 {
@@ -54,6 +56,7 @@ static inline u8 inb(u16 port)
     __asm__ volatile ("inb %1, %0" : "=a"(val) : "Nd"(port));
     return val;
 }
+
 
 static void keyboard_irq_handler(registers_t *regs)
 {
@@ -64,27 +67,31 @@ static void keyboard_irq_handler(registers_t *regs)
     if (sc == 0x00 || sc == 0xFF)
         return;
 
+    /* extended key prefix */
+    if (sc == 0xE0) { ext_pending = 1; return; }
+
+    if (ext_pending) {
+        ext_pending = 0;
+        if (!(sc & 0x80))   /* only on press, not release */
+            last_ext_sc = sc;
+        return;
+    }
+
     if (sc & 0x80) {
         u8 released = sc & 0x7F;
-        if (released == 0x2A || released == 0x36)
-            shift_held = 0;
-        if (released == 0x1D)
-            ctrl_held = 0;
+        if (released == 0x2A || released == 0x36) shift_held = 0;
+        if (released == 0x1D) ctrl_held = 0;
         return;
     }
 
     if (sc == 0x2A || sc == 0x36) { shift_held = 1; return; }
     if (sc == 0x1D)                { ctrl_held  = 1; return; }
-
-    if (sc >= SC_TABLE_SIZE)
-        return;
+    if (sc >= SC_TABLE_SIZE) return;
 
     char c = shift_held ? sc_ascii_shift[sc] : sc_ascii[sc];
     if (c) {
-        if (ctrl_held && c >= 'a' && c <= 'z')
-            c = c - 96;
-        else if (ctrl_held && c >= 'A' && c <= 'Z')
-            c = c - 64;
+        if (ctrl_held && c >= 'a' && c <= 'z') c = c - 96;
+        else if (ctrl_held && c >= 'A' && c <= 'Z') c = c - 64;
         last_char = c;
     }
 }
@@ -105,4 +112,11 @@ char keyboard_getchar(void)
     char c = last_char;
     last_char = 0;
     return c;
+}
+
+u8 keyboard_get_ext(void)
+{
+    u8 sc = last_ext_sc;
+    last_ext_sc = 0;
+    return sc;
 }
