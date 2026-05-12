@@ -13,6 +13,8 @@
  *   Ctrl-K          — delete current line
  *   Ctrl-E          — jump to end of line
  *   Ctrl-A          — jump to start of line
+ *   Ctrl-F          — find text
+ *   Ctrl-N          — find next occurrence
  *
  * layout:
  *   row 0           — title bar (filename, modified flag, keybinds)
@@ -38,6 +40,11 @@
 #define ROW_TEXT_E  22
 #define ROW_STATUS  23
 #define ROW_MSG     24
+
+static char  search_query[64];
+static int   search_row;
+static int   search_col;
+static void adjust_scroll(void);
 
 #define VGA_BASE  ((volatile u16 *)0xB8000)
 
@@ -183,6 +190,97 @@ static void buf_delete_line(void)
     modified = 1;
 }
 
+static int ed_find(const char *query)
+{
+    if (!query || !*query) return 0;
+    usize qlen = strlen(query);
+
+    /* search from current position forward, wrap around */
+    for (int line = cy; line < num_lines; line++) {
+        int start = (line == cy) ? cx + 1 : 0;
+        for (int c = start; c <= line_len[line] - (int)qlen; c++) {
+            if (!strncmp(buf[line] + c, query, qlen)) {
+                search_row = line;
+                search_col = c;
+                return 1;
+            }
+        }
+    }
+    /* wrap ->  search from beginning */
+    for (int line = 0; line <= cy; line++) {
+        int end = (line == cy) ? cx : line_len[line];
+        for (int c = 0; c <= end - (int)qlen; c++) {
+            if (!strncmp(buf[line] + c, query, qlen)) {
+                search_row = line;
+                search_col = c;
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+static void ed_search_prompt(void)
+{
+    /* draw search bar on message row */
+    ed_fill_row(ROW_MSG, ' ', VGA_COLOR_BLACK, VGA_COLOR_CYAN);
+    ed_str(1, ROW_MSG, "find: ", VGA_COLOR_WHITE, VGA_COLOR_CYAN);
+
+    char query[64];
+    int  qlen = 0;
+    memset(query, 0, sizeof(query));
+
+    /* keep existing query if any */
+    if (search_query[0]) {
+        strncpy(query, search_query, 63);
+        qlen = (int)strlen(query);
+        ed_str(7, ROW_MSG, query, VGA_COLOR_YELLOW, VGA_COLOR_CYAN);
+    }
+
+    /* draw cursor in search bar */
+    ed_put(7 + qlen, ROW_MSG, '_', VGA_COLOR_BLACK, VGA_COLOR_WHITE);
+
+    for (;;) {
+        char c = keyboard_getchar();
+        if (!c) { __asm__ volatile ("hlt"); continue; }
+
+        if (c == '\n' || c == ('f' - 96)) {
+            /* confirm search */
+            if (qlen > 0) {
+                strncpy(search_query, query, 63);
+                if (ed_find(search_query)) {
+                    cy = search_row;
+                    cx = search_col;
+                    adjust_scroll();
+                    strncpy(msg, "found.", 79);
+                } else {
+                    strncpy(msg, "not found.", 79);
+                }
+                msg_time = timer_ticks();
+            }
+            return;
+        }
+
+        if (c == 27 || c == ('q' - 96)) return;  
+
+        if (c == '\b') {
+            if (qlen > 0) {
+                query[--qlen] = '\0';
+                ed_put(7 + qlen + 1, ROW_MSG, ' ', VGA_COLOR_CYAN, VGA_COLOR_CYAN);
+                ed_put(7 + qlen,     ROW_MSG, '_', VGA_COLOR_BLACK, VGA_COLOR_WHITE);
+            }
+            continue;
+        }
+
+        if (c >= 32 && c < 127 && qlen < 63) {
+            query[qlen++] = c;
+            query[qlen]   = '\0';
+            ed_put(7 + qlen - 1, ROW_MSG, c,   VGA_COLOR_YELLOW, VGA_COLOR_CYAN);
+            ed_put(7 + qlen,     ROW_MSG, '_',  VGA_COLOR_BLACK,  VGA_COLOR_WHITE);
+        }
+    }
+}
+
 
 static void load_file(const char *path)
 {
@@ -283,8 +381,8 @@ static void render_titlebar(void)
     if (modified)
         ed_str(18 + (int)strlen(filename), ROW_TITLE,
                " [modified]", VGA_COLOR_RED, VGA_COLOR_LIGHT_GREY);
-    ed_str(55, ROW_TITLE, "^S save  ^Q quit  ^K del line",
-           VGA_COLOR_DARK_GREY, VGA_COLOR_LIGHT_GREY);
+    ed_str(45, ROW_TITLE, "^S save  ^Q quit  ^F find  ^K del",
+       VGA_COLOR_DARK_GREY, VGA_COLOR_LIGHT_GREY);
 }
 
 static void render_text(void)
@@ -362,8 +460,8 @@ static void render_msgbar(void)
     if (msg[0] && timer_ticks() - msg_time < 3000)
         ed_str(1, ROW_MSG, msg, VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
     else
-        ed_str(1, ROW_MSG, "^S save  ^Q quit  ^K kill line  ^A home  ^E end",
-               VGA_COLOR_DARK_GREY, VGA_COLOR_BLACK);
+       ed_str(1, ROW_MSG, "^S save  ^Q quit  ^K kill  ^A home  ^E end  ^F find  ^N next",
+                VGA_COLOR_DARK_GREY, VGA_COLOR_BLACK);
 }
 
 static void render_all(void)
@@ -452,6 +550,24 @@ void editor_open(const char *path)
         if (c >= 32 && c < 127) { 
             buf_insert_char(c); 
             goto redraw; 
+        }
+        if (c == 'f' - 96) {   /* Ctrl-F: find */
+            ed_search_prompt();
+            render_all();
+            continue;
+        }
+
+        if (c == 'n' - 96) {   /* Ctrl-N: find next */
+            if (search_query[0] && ed_find(search_query)) {
+                cy = search_row;
+                cx = search_col;
+                strncpy(msg, "found.", 79);
+                msg_time = timer_ticks();
+            } else {
+                strncpy(msg, "not found.", 79);
+                msg_time = timer_ticks();
+            }
+            goto redraw;
         }
 
         continue;
