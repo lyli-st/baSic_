@@ -19,6 +19,8 @@ CFLAGS  := -m32              \
             -fno-pic         \
             -nostdlib        \
             -nostdinc        \
+            -mno-sse         \
+            -mno-mmx         \
             -Wall            \
             -Wextra          \
             -O2              \
