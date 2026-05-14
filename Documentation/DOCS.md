@@ -381,6 +381,10 @@ net_udp_register(port, fn). 8 port handler slots. UDP checksum left as zero (val
 | edit \<file\> | text editor |
 | shoot | shooter game |
 | about | about baSic_ |
+| date     | full date and time in BDT              |
+| whoami   | print current user (root)              |
+| hostname | print HOSTNAME env var                 |
+| uname    | print system architecture info         |
 | alias | list active aliases from INIT.CFG |
 | ring3test | run first ring 3 user process |
 | reboot / halt | power |
