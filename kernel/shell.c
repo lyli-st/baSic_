@@ -1030,30 +1030,71 @@ static void cmd_about(void)
 }
 
 /* get current date. tho we have date below the shell. but thatll be removed soon. so we will need this */
-/* rn removed it cause not working as I intended to. Will fix it after some testing. */
+static void cmd_date(void)
+{
+    rtc_time_t t; rtc_read(&t);
+    int hour = (int)t.hour + TZ_OFFSET_H;
+    if (hour >= 24) hour -= 24;
+
+    static const char *days[]   = {"Sun","Mon","Tue","Wed","Thu","Fri","Sat"};
+    static const char *months[] = {
+        "Jan","Feb","Mar","Apr","May","Jun",
+        "Jul","Aug","Sep","Oct","Nov","Dec"
+    };
+
+    int m = t.month;
+    int y = 2000 + (int)t.year;
+    if (m < 3) { m += 12; y--; }
+    int k = y % 100;
+    int j = y / 100;
+    int dow = (t.day + (13*(m+1)/5) + k + k/4 + j/4 - 2*j) % 7;
+    if (dow < 0) dow += 7;
+    dow = (dow + 6) % 7;
+
+    const char *ds = days[dow];
+    const char *ms = (t.month >= 1 && t.month <= 12) ? months[t.month-1] : "???";
+
+    char buf[64]; int i = 0;
+    while (*ds) buf[i++] = *ds++;
+    buf[i++] = ' ';
+    while (*ms) buf[i++] = *ms++;
+    buf[i++] = ' ';
+    buf[i++] = '0' + t.day / 10; buf[i++] = '0' + t.day % 10;
+    buf[i++] = ' ';
+    buf[i++] = '0' + hour / 10;     buf[i++] = '0' + hour % 10;     buf[i++] = ':';
+    buf[i++] = '0' + t.minute / 10; buf[i++] = '0' + t.minute % 10; buf[i++] = ':';
+    buf[i++] = '0' + t.second / 10; buf[i++] = '0' + t.second % 10;
+    buf[i++] = ' '; buf[i++] = 'B'; buf[i++] = 'D'; buf[i++] = 'T';
+    buf[i++] = ' '; buf[i++] = '2'; buf[i++] = '0';
+    buf[i++] = '0' + (t.year / 10) % 10;
+    buf[i++] = '0' + t.year % 10;
+    buf[i] = '\0';
+    shell_puts(buf, VGA_COLOR_LIGHT_CYAN);
+    shell_newline();
+}
 
 /* when we can add users, itll change */
-// static void cmd_whoami(void)
-// {
-//     shell_puts("root", VGA_COLOR_LIGHT_GREEN);
-//     shell_newline();
-// }
+static void cmd_whoami(void)
+{
+    shell_puts("root", VGA_COLOR_LIGHT_GREEN);
+    shell_newline();
+}
 
 /* host OS */
-// static void cmd_hostname(void)
-// {
-//     const char *h = env_get("HOSTNAME");
-//     shell_puts(h ? h : "baSic_", VGA_COLOR_WHITE);
-//     shell_newline();
-// }
+static void cmd_hostname(void)
+{
+    const char *h = env_get("HOSTNAME");
+    shell_puts(h ? h : "baSic_", VGA_COLOR_WHITE);
+    shell_newline();
+}
 
 /* kinda like linux. will work on it later. Rn. lets keep it simple */
-// static void cmd_uname(void)
-// {
-//     shell_puts("baSic_ 1.0 x86 32-bit",
-//                VGA_COLOR_WHITE);
-//     shell_newline();
-// }
+static void cmd_uname(void)
+{
+    shell_puts("baSic_ 1.0 x86 32-bit",
+               VGA_COLOR_WHITE);
+    shell_newline();
+}
 
 /* shell scripts. */
 static void cmd_run(const char *path)
@@ -1276,10 +1317,10 @@ static void dispatch(void)
     if (!strcmp(cmd_buf,"halt"))     { cmd_halt();    return; }
     if (!strcmp(cmd_buf, "alias"))   { cmd_alias();   return; }
     if (!strcmp(cmd_buf, "netinfo")) { cmd_netinfo(); return; }
-    // if (!strcmp(cmd_buf,"date"))     { cmd_date();    return; }
-    // if (!strcmp(cmd_buf,"whoami"))   { cmd_whoami();  return; }
+    if (!strcmp(cmd_buf,"date"))     { cmd_date();    return; }
+    if (!strcmp(cmd_buf,"whoami"))   { cmd_whoami();  return; }
     if (!strcmp(cmd_buf,"hostname")) { cmd_hostname();return; }
-    // if (!strcmp(cmd_buf,"uname"))    { cmd_uname();   return; }
+    if (!strcmp(cmd_buf,"uname"))    { cmd_uname();   return; }
 
     if (!strcmp(cmd_buf, "poweroff")) { cmd_poweroff(); return; }
 
