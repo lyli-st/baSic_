@@ -379,7 +379,7 @@ static void tab_complete(void)
         "history","pwd","cd","ls","cat","write","mkdir","find","grep",
         "diskls","diskcat","diskwrite","diskdel","disksync","chmod",
         "touch","rm","mv","cp","wc","head","tail","netinfo","arp","ping",
-        "udpsend",
+        "udpsend", "date","whoami","hostname","uname",
         "edit","shoot","about","reboot","halt", NULL
     };
     cmd_buf[cmd_len] = '\0';
@@ -410,7 +410,7 @@ static void cmd_help(void)
 {
     shell_puts("baSic_ built-in commands:", VGA_COLOR_YELLOW);
     shell_newline();
-    shell_puts("  system   : help clear sysinfo about uptime time mem top dmesg", VGA_COLOR_LIGHT_GREY);
+    shell_puts("  system   : help clear sysinfo about uptime time date whoami hostname uname mem top dmesg", VGA_COLOR_LIGHT_GREY);
     shell_puts("  process  : ps kill spawn", VGA_COLOR_LIGHT_GREY);
     shell_puts("  env      : env export unset", VGA_COLOR_LIGHT_GREY);
     shell_puts("  math     : calc", VGA_COLOR_LIGHT_GREY);
@@ -1029,6 +1029,32 @@ static void cmd_about(void)
     shell_puts("  license : GPL v2", VGA_COLOR_WHITE); shell_newline();
 }
 
+/* get current date. tho we have date below the shell. but thatll be removed soon. so we will need this */
+/* rn removed it cause not working as I intended to. Will fix it after some testing. */
+
+/* when we can add users, itll change */
+// static void cmd_whoami(void)
+// {
+//     shell_puts("root", VGA_COLOR_LIGHT_GREEN);
+//     shell_newline();
+// }
+
+/* host OS */
+// static void cmd_hostname(void)
+// {
+//     const char *h = env_get("HOSTNAME");
+//     shell_puts(h ? h : "baSic_", VGA_COLOR_WHITE);
+//     shell_newline();
+// }
+
+/* kinda like linux. will work on it later. Rn. lets keep it simple */
+// static void cmd_uname(void)
+// {
+//     shell_puts("baSic_ 1.0 x86 32-bit",
+//                VGA_COLOR_WHITE);
+//     shell_newline();
+// }
+
 /* shell scripts. */
 static void cmd_run(const char *path)
 {
@@ -1250,6 +1276,10 @@ static void dispatch(void)
     if (!strcmp(cmd_buf,"halt"))     { cmd_halt();    return; }
     if (!strcmp(cmd_buf, "alias"))   { cmd_alias();   return; }
     if (!strcmp(cmd_buf, "netinfo")) { cmd_netinfo(); return; }
+    // if (!strcmp(cmd_buf,"date"))     { cmd_date();    return; }
+    // if (!strcmp(cmd_buf,"whoami"))   { cmd_whoami();  return; }
+    if (!strcmp(cmd_buf,"hostname")) { cmd_hostname();return; }
+    // if (!strcmp(cmd_buf,"uname"))    { cmd_uname();   return; }
 
     if (!strcmp(cmd_buf, "poweroff")) { cmd_poweroff(); return; }
 
