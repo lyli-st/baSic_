@@ -56,7 +56,7 @@ dap1:
 dap2:
     db 0x10
     db 0x00
-    dw 64
+    dw 128          ; this caused the issue! -> memory corruption
     dw 0x0000       ; offset
     dw 0x1000       ; segment → physical 0x10000
     dq 65   
