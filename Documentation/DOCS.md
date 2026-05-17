@@ -385,6 +385,8 @@ net_udp_register(port, fn). 8 port handler slots. UDP checksum left as zero (val
 | whoami   | print current user (root)              |
 | hostname | print HOSTNAME env var                 |
 | uname    | print system architecture info         |
+| sort <file> | sort lines alphabetically (bubble sort, 64 line max) |
+| uniq <file> | remove consecutive duplicate lines                   |
 | alias | list active aliases from INIT.CFG |
 | ring3test | run first ring 3 user process |
 | reboot / halt | power |
