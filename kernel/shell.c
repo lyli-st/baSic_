@@ -379,7 +379,7 @@ static void tab_complete(void)
         "history","pwd","cd","ls","cat","write","mkdir","find","grep",
         "diskls","diskcat","diskwrite","diskdel","disksync","chmod",
         "touch","rm","mv","cp","wc","head","tail","netinfo","arp","ping",
-        "udpsend", "date","whoami","hostname","uname",
+        "udpsend", "date","whoami","hostname","uname", "sort","uniq",
         "edit","shoot","about","reboot","halt", NULL
     };
     cmd_buf[cmd_len] = '\0';
@@ -416,7 +416,7 @@ static void cmd_help(void)
     shell_puts("  math     : calc", VGA_COLOR_LIGHT_GREY);
     shell_puts("  display  : color", VGA_COLOR_LIGHT_GREY);
     shell_puts("  nav      : pwd cd ls", VGA_COLOR_LIGHT_GREY);
-    shell_puts("  files    : cat write mkdir find grep edit touch rm mv cp wc head tail", VGA_COLOR_LIGHT_GREY);
+    shell_puts("  files    : cat write mkdir find grep edit touch rm mv cp wc head tail sort uniq", VGA_COLOR_LIGHT_GREY);
     shell_puts("  net      : netinfo arp ping udpsend", VGA_COLOR_LIGHT_GREY);
     shell_puts("  script   : run", VGA_COLOR_LIGHT_GREY);
     shell_puts("  disk     : diskls diskcat diskwrite diskdel disksync chmod", VGA_COLOR_LIGHT_GREY);
@@ -906,6 +906,89 @@ static void cmd_tail(const char *path, int count)
     }
 }
 
+static void cmd_sort(const char *path)
+{
+    if (!path||!*path) { shell_puts("usage: sort <file>", VGA_COLOR_LIGHT_RED); shell_newline(); return; }
+    char full[VFS_PATH_MAX]; make_full(full, path);
+    vfs_node_t *node = vfs_resolve(full);
+    if (!node||!(node->flags&VFS_FILE)) { shell_puts("sort: not found", VGA_COLOR_LIGHT_RED); shell_newline(); return; }
+
+    /* approach here is: reading all lines into a fixed array */
+    static char lines[64][128];
+    int count = 0;
+    u8 tmp[128]; u32 off = 0; u32 n;
+    char line[128]; int lpos = 0;
+
+    while ((n = vfs_read(node, off, sizeof(tmp), tmp)) > 0) {
+        for (u32 i = 0; i < n && count < 64; i++) {
+            char c = (char)tmp[i];
+            if (c == '\n') {
+                line[lpos] = '\0';
+                strncpy(lines[count++], line, 127);
+                lpos = 0;
+            } else if (lpos < 127) line[lpos++] = c;
+        }
+        off += n;
+    }
+    if (lpos > 0 && count < 64) {
+        line[lpos] = '\0';
+        strncpy(lines[count++], line, 127);
+    }
+
+    /* using bubble sort here, were dealing with small files rn, so fn good enough */
+    for (int i = 0; i < count - 1; i++)
+        for (int j = 0; j < count - i - 1; j++)
+            if (strcmp(lines[j], lines[j+1]) > 0) {
+                char tmp2[128];
+                strncpy(tmp2, lines[j], 127);
+                strncpy(lines[j], lines[j+1], 127);
+                strncpy(lines[j+1], tmp2, 127);
+            }
+
+    for (int i = 0; i < count; i++) {
+        shell_puts(lines[i], VGA_COLOR_WHITE);
+        shell_newline();
+    }
+}
+
+static void cmd_uniq(const char *path)
+{
+    if (!path||!*path) { shell_puts("usage: uniq <file>", VGA_COLOR_LIGHT_RED); shell_newline(); return; }
+    char full[VFS_PATH_MAX]; make_full(full, path);
+    vfs_node_t *node = vfs_resolve(full);
+    if (!node||!(node->flags&VFS_FILE)) { shell_puts("uniq: not found", VGA_COLOR_LIGHT_RED); shell_newline(); return; }
+
+    u8 tmp[128]; u32 off = 0; u32 n;
+    char line[128]; int lpos = 0;
+    char prev[128]; prev[0] = '\0';
+    int first = 1;
+
+    while ((n = vfs_read(node, off, sizeof(tmp), tmp)) > 0) {
+        for (u32 i = 0; i < n; i++) {
+            char c = (char)tmp[i];
+            if (c == '\n') {
+                line[lpos] = '\0';
+                if (first || strcmp(line, prev) != 0) {
+                    shell_puts(line, VGA_COLOR_WHITE);
+                    shell_newline();
+                    strncpy(prev, line, 127);
+                    first = 0;
+                }
+                lpos = 0;
+            } else if (lpos < 127) line[lpos++] = c;
+        }
+        off += n;
+    }
+    /* last line without newline */
+    if (lpos > 0) {
+        line[lpos] = '\0';
+        if (first || strcmp(line, prev) != 0) {
+            shell_puts(line, VGA_COLOR_WHITE);
+            shell_newline();
+        }
+    }
+}
+
 static void cmd_find(const char *name)
 {
     if (!name||!*name) { shell_puts("usage: find <n>", VGA_COLOR_LIGHT_RED); shell_newline(); return; }
@@ -1354,6 +1437,8 @@ static void dispatch(void)
     if (!strncmp(cmd_buf,"head ", 5)) { cmd_head(cmd_buf+5, 10);       return; }
     if (!strncmp(cmd_buf,"tail ", 5)) { cmd_tail(cmd_buf+5, 10);       return; }
 
+    if (!strncmp(cmd_buf,"sort ",  5)) { cmd_sort(cmd_buf+5);  return; }
+    if (!strncmp(cmd_buf,"uniq ",  5)) { cmd_uniq(cmd_buf+5);  return; }
     if (!strncmp(cmd_buf,"udpsend ",8)) { cmd_udpsend(cmd_buf+8); return; }
     if (!strncmp(cmd_buf,"arp ",    4)) { cmd_arp(cmd_buf+4);     return; }
     if (!strncmp(cmd_buf,"ping ",   5)) { cmd_ping(cmd_buf+5);    return; }
