@@ -51,6 +51,7 @@
 #define HISTORY_FILE "HISTORY"
 
 static char cwd[VFS_PATH_MAX] = "/";
+static char prev_cwd[VFS_PATH_MAX] = "/";
 static char history[HISTORY_SIZE][CMD_BUF_SIZE];
 static int  history_count = 0;
 static int  history_idx   = -1;
@@ -423,7 +424,7 @@ static void cmd_help(void)
     shell_puts("  fun      : shoot", VGA_COLOR_LIGHT_CYAN);
     shell_puts("  power    : reboot halt poweroff", VGA_COLOR_LIGHT_GREY);
     shell_newline();
-    shell_puts("  keys: Tab=complete  Up/Down=history  Left/Right=cursor", VGA_COLOR_DARK_GREY);
+    shell_puts("  keys: Tab=complete  Up/Down=history  Ctrl-R=search  Left/Right=cursor", VGA_COLOR_DARK_GREY);
 }
 
 static void cmd_clear(void)
@@ -620,12 +621,28 @@ static void cmd_pwd(void)  { shell_puts(cwd, VGA_COLOR_WHITE); shell_newline(); 
 static void cmd_cd(const char *path)
 {
     if (!path||!*path) { strncpy(cwd,"/",VFS_PATH_MAX); draw_status(); return; }
-    char full[VFS_PATH_MAX]; make_full(full,path);
-    vfs_node_t *node=vfs_resolve(full);
+
+    /* cd - goes back to previous dir */
+    if (path[0] == '-' && path[1] == '\0') {
+        char tmp[VFS_PATH_MAX];
+        strncpy(tmp, cwd, VFS_PATH_MAX - 1);
+        strncpy(cwd, prev_cwd, VFS_PATH_MAX - 1);
+        strncpy(prev_cwd, tmp, VFS_PATH_MAX - 1);
+        cwd[VFS_PATH_MAX-1] = '\0';
+        draw_status();
+        shell_puts(cwd, VGA_COLOR_WHITE);
+        shell_newline();
+        return;
+    }
+
+    char full[VFS_PATH_MAX]; make_full(full, path);
+    vfs_node_t *node = vfs_resolve(full);
     if (!node||!(node->flags&VFS_DIR)) {
         shell_puts("cd: no such directory", VGA_COLOR_LIGHT_RED); shell_newline(); return;
     }
-    strncpy(cwd,full,VFS_PATH_MAX-1); cwd[VFS_PATH_MAX-1]='\0';
+    strncpy(prev_cwd, cwd, VFS_PATH_MAX - 1);
+    strncpy(cwd, full, VFS_PATH_MAX - 1);
+    cwd[VFS_PATH_MAX-1] = '\0';
     draw_status();
 }
 
@@ -1376,6 +1393,21 @@ static void dispatch(void)
 {
     cmd_buf[cmd_len]='\0';
     if (!cmd_len) return;
+    if (cmd_len == 2 && cmd_buf[0] == '!' && cmd_buf[1] == '!') {
+        if (history_count > 0) {
+            const char *last = history[(history_count - 1) % HISTORY_SIZE];
+            usize len = strlen(last);
+            if (len < CMD_BUF_SIZE) {
+                memcpy(cmd_buf, last, len);
+                cmd_buf[len] = '\0';
+                cmd_len = (int)len;
+            }
+        } else {
+            shell_puts("no previous command", VGA_COLOR_LIGHT_GREY);
+            shell_newline();
+            return;
+        }
+    }
     draw_status();   
     watchdog_kick();
 
@@ -1568,6 +1600,99 @@ void shell_init(void)
 //     str_at(68, STATUS_ROW, ubuf, VGA_COLOR_YELLOW, VGA_COLOR_DARK_GREY);
 // }
 
+static void ctrl_r_search(void)
+{
+    char query[CMD_BUF_SIZE];
+    int  qlen = 0;
+    memset(query, 0, sizeof(query));
+
+    /* draw search prompt on prompt row */
+    fill_row(PROMPT_ROW, ' ', VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+    str_at(0, PROMPT_ROW, "(reverse-i-search)`': ", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+
+    for (;;) {
+        /* find best match */
+        int match = -1;
+        if (qlen > 0) {
+            for (int i = history_count - 1; i >= 0; i--) {
+                const char *h = history[i % HISTORY_SIZE];
+                usize hlen = strlen(h);
+                usize qsz  = (usize)qlen;
+                for (usize j = 0; j + qsz <= hlen; j++) {
+                    if (!strncmp(h + j, query, qsz)) { match = i; goto found; }
+                }
+            }
+        }
+    found:
+        /* redraw prompt with current query and match */
+        fill_row(PROMPT_ROW, ' ', VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+        str_at(0, PROMPT_ROW, "(reverse-i-search)`",
+               VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+        str_at(19, PROMPT_ROW, query, VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
+        str_at(19 + qlen, PROMPT_ROW, "': ",
+               VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+        if (match >= 0)
+            str_at(22 + qlen, PROMPT_ROW,
+                   history[match % HISTORY_SIZE],
+                   VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+
+        char c = keyboard_getchar();
+        if (!c) { __asm__ volatile ("hlt"); continue; }
+
+        if (c == '\n') {
+            /* accept match — load into cmd_buf */
+            if (match >= 0) {
+                const char *h = history[match % HISTORY_SIZE];
+                usize len = strlen(h);
+                if (len < CMD_BUF_SIZE) {
+                    memcpy(cmd_buf, h, len);
+                    cmd_buf[len] = '\0';
+                    cmd_len = cursor_pos = (int)len;
+                }
+            }
+            prompt_redraw();
+            return;
+        }
+
+        if (c == ('r' - 96)) {
+            /* Ctrl-R again — search further back */
+            if (match > 0) {
+                /* search before current match */
+                int new_match = -1;
+                for (int i = match - 1; i >= 0; i--) {
+                    const char *h = history[i % HISTORY_SIZE];
+                    usize hlen = strlen(h);
+                    usize qsz  = (usize)qlen;
+                    for (usize j = 0; j + qsz <= hlen; j++) {
+                        if (!strncmp(h + j, query, qsz)) { new_match = i; goto found2; }
+                    }
+                }
+    found2:
+                if (new_match >= 0) match = new_match;
+            }
+            continue;
+        }
+
+        /* Ctrl-C or Esc — cancel */
+        if (c == ('c' - 96) || c == 27) {
+            cmd_len = cursor_pos = 0;
+            memset(cmd_buf, 0, CMD_BUF_SIZE);
+            prompt_redraw();
+            return;
+        }
+
+        if (c == '\b') {
+            if (qlen > 0) query[--qlen] = '\0';
+            continue;
+        }
+
+        if (c >= 32 && c < 127 && qlen < CMD_BUF_SIZE - 1) {
+            query[qlen++] = c;
+            query[qlen]   = '\0';
+        }
+    }
+}
+
 void shell_run(void)
 {
     u32 last_s = (u32)-1;
@@ -1628,7 +1753,12 @@ void shell_run(void)
                 if (ev.ch == ('u'-96)) {
                     cmd_len=0; cursor_pos=0;
                     memset(cmd_buf,0,CMD_BUF_SIZE); prompt_redraw();
-                } else if (ev.ch >= 32 && ev.ch < 127 && cmd_len < CMD_BUF_SIZE-1) {
+                }
+                if (ev.ch == ('r' - 96)) {
+                    ctrl_r_search();
+                    break;
+                }
+                else if (ev.ch >= 32 && ev.ch < 127 && cmd_len < CMD_BUF_SIZE-1) {
                     for (int i=cmd_len; i>cursor_pos; i--) cmd_buf[i]=cmd_buf[i-1];
                     cmd_buf[cursor_pos++]=ev.ch;
                     cmd_len++;
