@@ -78,6 +78,12 @@ static void str_at(int col, int row, const char *s, u8 fg, u8 bg)
         put(col++, row, *s++, fg, bg);
 }
 
+static int streq(const char *a, const char *b)
+{
+    while (*a && (*a == *b)) { a++; b++; }
+    return (u8)*a - (u8)*b;
+}
+
 static void draw_status(void)
 {
     fill_row(STATUS_ROW, ' ', VGA_COLOR_BLACK, VGA_COLOR_DARK_GREY);
@@ -725,7 +731,7 @@ static void cmd_rm(const char *name)
     rd_t *rd = (rd_t *)parent->inode;
     if (!rd) { shell_puts("rm: bad dir", VGA_COLOR_LIGHT_RED); shell_newline(); return; }
     for (u32 i = 0; i < rd->cnt; i++) {
-        if (!strcmp(rd->ch[i]->name, name)) {
+        if (!streq(rd->ch[i]->name, name)) {
             if (rd->ch[i]->flags & VFS_DIR) {
                 shell_puts("rm: is a directory", VGA_COLOR_LIGHT_RED); shell_newline(); return;
             }
@@ -824,7 +830,7 @@ static void find_recurse(vfs_node_t *dir, const char *name, const char *path, in
         usize plen=strlen(cpath);
         if (plen<VFS_PATH_MAX-2&&cpath[plen-1]!='/'){cpath[plen++]='/';cpath[plen]='\0';}
         strncpy(cpath+plen,child->name,VFS_PATH_MAX-plen-1);
-        if (!strcmp(child->name,name)){shell_puts(cpath,VGA_COLOR_LIGHT_GREEN);shell_newline();(*found)++;}
+        if (!streq(child->name,name)){shell_puts(cpath,VGA_COLOR_LIGHT_GREEN);shell_newline();(*found)++;}
         if (child->flags&VFS_DIR) find_recurse(child,name,cpath,found);
     }
 }
@@ -955,7 +961,7 @@ static void cmd_sort(const char *path)
     /* using bubble sort here, were dealing with small files rn, so fn good enough */
     for (int i = 0; i < count - 1; i++)
         for (int j = 0; j < count - i - 1; j++)
-            if (strcmp(lines[j], lines[j+1]) > 0) {
+            if (streq(lines[j], lines[j+1]) > 0) {
                 char tmp2[128];
                 strncpy(tmp2, lines[j], 127);
                 strncpy(lines[j], lines[j+1], 127);
@@ -985,7 +991,7 @@ static void cmd_uniq(const char *path)
             char c = (char)tmp[i];
             if (c == '\n') {
                 line[lpos] = '\0';
-                if (first || strcmp(line, prev) != 0) {
+                if (first || streq(line, prev) != 0) {
                     shell_puts(line, VGA_COLOR_WHITE);
                     shell_newline();
                     strncpy(prev, line, 127);
@@ -999,7 +1005,7 @@ static void cmd_uniq(const char *path)
     /* last line without newline */
     if (lpos > 0) {
         line[lpos] = '\0';
-        if (first || strcmp(line, prev) != 0) {
+        if (first || streq(line, prev) != 0) {
             shell_puts(line, VGA_COLOR_WHITE);
             shell_newline();
         }
@@ -1387,12 +1393,6 @@ static void cmd_alias(void)
         }
     }
     if (!found) { shell_puts("no aliases.", VGA_COLOR_LIGHT_GREY); shell_newline(); }
-}
-
-static int streq(const char *a, const char *b)
-{
-    while (*a && *b && *a == *b) { a++; b++; }
-    return *a == '\0' && *b == '\0';
 }
 
 static void dispatch(void)
