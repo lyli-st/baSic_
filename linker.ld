@@ -36,8 +36,7 @@ SECTIONS
     }
 
     /*  zero-initialised data */
-    .bss :
-    {
+    .bss : {
         *(COMMON)
         *(.bss)
         *(.bss.*)
