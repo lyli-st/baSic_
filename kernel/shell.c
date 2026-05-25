@@ -1389,10 +1389,23 @@ static void cmd_alias(void)
     if (!found) { shell_puts("no aliases.", VGA_COLOR_LIGHT_GREY); shell_newline(); }
 }
 
+static int streq(const char *a, const char *b)
+{
+    while (*a && *b && *a == *b) { a++; b++; }
+    return *a == '\0' && *b == '\0';
+}
+
 static void dispatch(void)
 {
     cmd_buf[cmd_len]='\0';
     if (!cmd_len) return;
+     volatile u16 *vga = (volatile u16 *)0xB8000;
+    for (int _i = 0; _i < cmd_len && _i < 10; _i++)
+        vga[_i] = (u16)(0x0E00 | (u8)cmd_buf[_i]);
+    vga[10] = (u16)(0x0E00 | ('0' + cmd_len));
+
+    draw_status();
+    watchdog_kick();
     if (cmd_len == 2 && cmd_buf[0] == '!' && cmd_buf[1] == '!') {
         if (history_count > 0) {
             const char *last = history[(history_count - 1) % HISTORY_SIZE];
@@ -1411,33 +1424,33 @@ static void dispatch(void)
     draw_status();   
     watchdog_kick();
 
-    if (!strcmp(cmd_buf,"help"))     { cmd_help();    return; }
-    if (!strcmp(cmd_buf,"clear"))    { cmd_clear();   return; }
-    if (!strcmp(cmd_buf,"uptime"))   { cmd_uptime();  return; }
-    if (!strcmp(cmd_buf,"time"))     { cmd_time();    return; }
-    if (!strcmp(cmd_buf,"mem"))      { cmd_mem();     return; }
-    if (!strcmp(cmd_buf,"sysinfo"))  { cmd_sysinfo(); return; }
-    if (!strcmp(cmd_buf,"dmesg"))    { cmd_dmesg();   return; }
-    if (!strcmp(cmd_buf,"top"))      { cmd_top();     return; }
-    if (!strcmp(cmd_buf,"ps"))       { cmd_ps();      return; }
-    if (!strcmp(cmd_buf,"history"))  { cmd_history(); return; }
-    if (!strcmp(cmd_buf,"pwd"))      { cmd_pwd();     return; }
-    if (!strcmp(cmd_buf,"ls"))       { cmd_ls();      return; }
-    if (!strcmp(cmd_buf,"env"))      { cmd_env();     return; }
-    if (!strcmp(cmd_buf,"diskls"))   { cmd_diskls();  return; }
-    if (!strcmp(cmd_buf,"disksync")) { cmd_disksync();return; }
-    if (!strcmp(cmd_buf,"about"))    { cmd_about();   return; }
-    if (!strcmp(cmd_buf,"shoot"))    { cmd_shoot();   return; }
-    if (!strcmp(cmd_buf,"reboot"))   { cmd_reboot();  return; }
-    if (!strcmp(cmd_buf,"halt"))     { cmd_halt();    return; }
-    if (!strcmp(cmd_buf, "alias"))   { cmd_alias();   return; }
-    if (!strcmp(cmd_buf, "netinfo")) { cmd_netinfo(); return; }
-    if (!strcmp(cmd_buf,"date"))     { cmd_date();    return; }
-    if (!strcmp(cmd_buf,"whoami"))   { cmd_whoami();  return; }
-    if (!strcmp(cmd_buf,"hostname")) { cmd_hostname();return; }
-    if (!strcmp(cmd_buf,"uname"))    { cmd_uname();   return; }
+    if (!streq(cmd_buf,"help"))     { cmd_help();    return; }
+    if (!streq(cmd_buf,"clear"))    { cmd_clear();   return; }
+    if (!streq(cmd_buf,"uptime"))   { cmd_uptime();  return; }
+    if (!streq(cmd_buf,"time"))     { cmd_time();    return; }
+    if (!streq(cmd_buf,"mem"))      { cmd_mem();     return; }
+    if (!streq(cmd_buf,"sysinfo"))  { cmd_sysinfo(); return; }
+    if (!streq(cmd_buf,"dmesg"))    { cmd_dmesg();   return; }
+    if (!streq(cmd_buf,"top"))      { cmd_top();     return; }
+    if (!streq(cmd_buf,"ps"))       { cmd_ps();      return; }
+    if (!streq(cmd_buf,"history"))  { cmd_history(); return; }
+    if (!streq(cmd_buf,"pwd"))      { cmd_pwd();     return; }
+    if (!streq(cmd_buf,"ls"))       { cmd_ls();      return; }
+    if (!streq(cmd_buf,"env"))      { cmd_env();     return; }
+    if (!streq(cmd_buf,"diskls"))   { cmd_diskls();  return; }
+    if (!streq(cmd_buf,"disksync")) { cmd_disksync();return; }
+    if (!streq(cmd_buf,"about"))    { cmd_about();   return; }
+    if (!streq(cmd_buf,"shoot"))    { cmd_shoot();   return; }
+    if (!streq(cmd_buf,"reboot"))   { cmd_reboot();  return; }
+    if (!streq(cmd_buf,"halt"))     { cmd_halt();    return; }
+    if (!streq(cmd_buf, "alias"))   { cmd_alias();   return; }
+    if (!streq(cmd_buf, "netinfo")) { cmd_netinfo(); return; }
+    if (!streq(cmd_buf,"date"))     { cmd_date();    return; }
+    if (!streq(cmd_buf,"whoami"))   { cmd_whoami();  return; }
+    if (!streq(cmd_buf,"hostname")) { cmd_hostname();return; }
+    if (!streq(cmd_buf,"uname"))    { cmd_uname();   return; }
 
-    if (!strcmp(cmd_buf, "poweroff")) { cmd_poweroff(); return; }
+    if (!streq(cmd_buf, "poweroff")) { cmd_poweroff(); return; }
 
     if (!strncmp(cmd_buf,"cp ",   3)) {
         char *sp = cmd_buf+3; while(*sp&&*sp!=' ') sp++;
