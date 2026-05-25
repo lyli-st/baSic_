@@ -72,11 +72,18 @@ flush:
     mov ss, ax
     mov esp, 0x9F000
 
-    ; sanity check — write green 'S' at top-left
-    mov dword [0xB8000], 0x0A4B0A4F 
+    mov dword [0xB8000], 0x0A4B0A4F
+
+    ; zero BSS — hardcoded safe range
+    ; kernel binary ends at ~0x1B600, round up to 0x1C000
+    ; zero from 0x1C000 to 0x80000 covering all static vars
+    mov edi, 0x1C000
+    mov ecx, 0x80000
+    sub ecx, edi
+    xor eax, eax
+    rep stosb
 
     call kmain
-
 .hang:
     cli
     hlt
