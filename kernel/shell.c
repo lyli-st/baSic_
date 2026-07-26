@@ -60,6 +60,12 @@ static void shell_newline(void);
 static void shell_exec_line(char *line);
 static void dispatch(void);
 
+static int streq(const char *a, const char *b)
+{
+    while (*a && (*a == *b)) { a++; b++; }
+    return (u8)*a - (u8)*b;
+}
+
 static inline void put(int col, int row, char c, u8 fg, u8 bg)
 {
     if (col < 0 || col >= VGA_W || row < 0 || row >= VGA_H) return;
@@ -76,12 +82,6 @@ static void str_at(int col, int row, const char *s, u8 fg, u8 bg)
 {
     while (*s && col < VGA_W)
         put(col++, row, *s++, fg, bg);
-}
-
-static int streq(const char *a, const char *b)
-{
-    while (*a && (*a == *b)) { a++; b++; }
-    return (u8)*a - (u8)*b;
 }
 
 static void draw_status(void)
@@ -1399,11 +1399,6 @@ static void dispatch(void)
 {
     cmd_buf[cmd_len]='\0';
     if (!cmd_len) return;
-     volatile u16 *vga = (volatile u16 *)0xB8000;
-    for (int _i = 0; _i < cmd_len && _i < 10; _i++)
-        vga[_i] = (u16)(0x0E00 | (u8)cmd_buf[_i]);
-    vga[10] = (u16)(0x0E00 | ('0' + cmd_len));
-
     draw_status();
     watchdog_kick();
     if (cmd_len == 2 && cmd_buf[0] == '!' && cmd_buf[1] == '!') {

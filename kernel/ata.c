@@ -92,17 +92,8 @@ int ata_init(void)
     ata_delay();
     outb(ATA_ALT_STATUS, 0x00);
     ata_delay();
-
     outb(ATA_DRIVE, 0xA0);
     ata_delay();
-
-    outb(ATA_SECCOUNT, 0);
-    outb(ATA_LBA_LO,   0);
-    outb(ATA_LBA_MID,  0);
-    outb(ATA_LBA_HI,   0);
-    outb(ATA_CMD, ATA_CMD_IDENTIFY);
-    ata_delay();
-
     u8 status = inb(ATA_STATUS);
     if (status == 0) {
         kprintf("[ATA] no drive detected\n");

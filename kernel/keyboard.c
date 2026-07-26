@@ -101,9 +101,10 @@ void keyboard_init(void)
     last_char  = 0;
     shift_held = 0;
     ctrl_held  = 0;
+    ext_pending = 0;   
+    last_ext_sc = 0;   
     /* flush BIOS leftover bytes */
-     while (inb(0x64) & 0x01)
-        inb(0x60);
+    while (inb(0x64) & 0x01) inb(0x60);
     irq_register(1, keyboard_irq_handler);
 }
 
