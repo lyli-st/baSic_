@@ -1360,6 +1360,12 @@ static void cmd_poweroff(void)
     shell_newline();
     timer_sleep(500);
 
+    /* try ACPI shutdown via keyboard controller. it works on most real hardware */
+    __asm__ volatile (
+        "cli\n"
+        /* try triple fault reset as fallback */
+    );
+
     /*
         for peace of my mind:
         mov ax, 0x2000
@@ -1369,6 +1375,18 @@ static void cmd_poweroff(void)
     __asm__ volatile ("outw %w0, %w1" : : "a"((u16)0x2000), "Nd"((u16)0x604));
 
     __asm__ volatile ("outw %w0, %w1" : : "a"((u16)0x0|0x2000), "Nd"((u16)0xB004));
+     /* this for real hardware .trigger reboot via keyboard controller instead */
+    __asm__ volatile (
+        "mov $0xFE, %%al\n"
+        "outb %%al, $0x64\n"
+        : : : "al"
+    );
+    /* last resort n here. triple fault */
+    __asm__ volatile (
+        "lidt (%%eax)\n"
+        "int $0\n"
+        : : "a"(0)
+    );
 
     /* if still running just halt */
     __asm__ volatile ("cli; hlt");
