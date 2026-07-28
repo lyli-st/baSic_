@@ -81,10 +81,15 @@ void kmain(void)
     net_init();
     if (fat12_init())
         disksync_run_init();
-
+    process_t *shell_proc = proc_create("shell", 0); /* shell always running, unless i change it */
+    if (shell_proc) {
+        shell_proc->state = PROC_RUNNING;
+        proc_set_current(shell_proc->pid);
+    }
     __asm__ volatile ("sti");
     sched_start();
 
     shell_init();
     shell_run();
+
 }

@@ -336,6 +336,11 @@ run <script> reads a file line by line from ramfs or FAT12 and passes each line 
 ### PCI
 PCI config space accessed via ports 0xCF8 (address) and 0xCFC (data).
 
+### Process Table 
+
+ps now reads the actual process table via proc_table_get() and prints PID, PPID, state, and name for every non-UNUSED slot. proctest command
+dumps the same info in a simpler format and shows active process count.
+
 ### Network (e1000)
 
 UDP: net_udp_send() builds ethernet+IP+UDP frame, resolves ARP if needed, sends via e1000. handle_udp() dispatches incoming UDP packets to registered port handlers via 
