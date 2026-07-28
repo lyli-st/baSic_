@@ -134,40 +134,6 @@ static void draw_status(void)
     str_at(68, STATUS_ROW, ubuf, VGA_COLOR_YELLOW, VGA_COLOR_DARK_GREY);
 }
 
-// static void shell_splash(void)
-// {
-//     vga_clear();
-
-//     /* full-screen centered splash */
-//     u8 c1 = VGA_COLOR_LIGHT_CYAN;
-//     u8 c2 = VGA_COLOR_WHITE;
-//     u8 c4 = VGA_COLOR_DARK_GREY;
-//     u8 bk = VGA_COLOR_BLACK;
-
-//     str_at(18, 7,  "  _               _      ", c1, bk);
-//     str_at(18, 8,  " | |__   __ _ ___(_) ___ ", c1, bk);
-//     str_at(18, 9,  " | '_ \\ / _` / __| |/ __|", c1, bk);
-//     str_at(18, 10, " | |_) | (_| \\__ \\ | (__ ", c1, bk);
-//     str_at(18, 11, " |_.__/ \\__,_|___/_|\\___|", c1, bk);
-
-//     str_at(34, 13, "v1.0",               c2, bk);
-
-//     /* decorative separator */
-//     for (int col = 10; col < 70; col++)
-//         put(col, 16, '-', c4, bk);
-
-//     str_at(23, 18, "booting baSic_...", c4, bk);
-
-//     timer_sleep(2000);
-//     vga_clear();
-// }
-
-static void shell_splash(void)
-{
-    vga_clear();
-    /* splash disabled for debugging */
-}
-
 static void scroll(void)
 {
     for (int r = TERM_TOP; r < TERM_BOT; r++)
@@ -1593,38 +1559,6 @@ void shell_init(void)
     shell_newline();
     prompt_redraw();
 }
-
-// static void draw_status_time(void)
-// {
-//     static u8 last_sec = 0xFF;
-
-//     rtc_time_t t;
-//     rtc_read(&t);
-
-//     if (t.second == last_sec)
-//         return;
-//     last_sec = t.second;
-//     wait_vretrace();
-
-//     int hour = (int)t.hour + TZ_OFFSET_H;
-//     if (hour >= 24) hour -= 24;
-
-//     char tbuf[32]; int i = 0;
-//     tbuf[i++] = '0' + hour/10;     tbuf[i++] = '0' + hour%10;     tbuf[i++] = ':';
-//     tbuf[i++] = '0' + t.minute/10; tbuf[i++] = '0' + t.minute%10; tbuf[i++] = ':';
-//     tbuf[i++] = '0' + t.second/10; tbuf[i++] = '0' + t.second%10;
-//     tbuf[i++] = ' '; tbuf[i++] = 'B'; tbuf[i++] = 'D'; tbuf[i] = '\0';
-//     str_at(55, STATUS_ROW, tbuf, VGA_COLOR_LIGHT_CYAN, VGA_COLOR_DARK_GREY);
-
-//     u32 s = timer_ticks() / 1000;
-//     u8 uh=(u8)(s/3600), um=(u8)((s%3600)/60), us=(u8)(s%60);
-//     char ubuf[16]; int j = 0;
-//     ubuf[j++]='|'; ubuf[j++]=' ';
-//     ubuf[j++]='0'+uh/10; ubuf[j++]='0'+uh%10; ubuf[j++]=':';
-//     ubuf[j++]='0'+um/10; ubuf[j++]='0'+um%10; ubuf[j++]=':';
-//     ubuf[j++]='0'+us/10; ubuf[j++]='0'+us%10; ubuf[j]='\0';
-//     str_at(68, STATUS_ROW, ubuf, VGA_COLOR_YELLOW, VGA_COLOR_DARK_GREY);
-// }
 
 static void ctrl_r_search(void)
 {
