@@ -5,7 +5,6 @@
  * baSic_ text editor
  *
  * controls:
- *   arrows / WASD   — move cursor
  *   Enter           — new line
  *   Backspace       — delete char left
  *   Ctrl-S          — save
