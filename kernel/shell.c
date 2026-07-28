@@ -353,6 +353,7 @@ static void tab_complete(void)
         "diskls","diskcat","diskwrite","diskdel","disksync","chmod",
         "touch","rm","mv","cp","wc","head","tail","netinfo","arp","ping",
         "udpsend", "date","whoami","hostname","uname", "sort","uniq",
+        "proctest",
         "edit","shoot","about","reboot","halt", NULL
     };
     cmd_buf[cmd_len] = '\0';
@@ -384,7 +385,7 @@ static void cmd_help(void)
     shell_puts("baSic_ built-in commands:", VGA_COLOR_YELLOW);
     shell_newline();
     shell_puts("  system   : help clear sysinfo about uptime time date whoami hostname uname mem top dmesg", VGA_COLOR_LIGHT_GREY);
-    shell_puts("  process  : ps kill spawn", VGA_COLOR_LIGHT_GREY);
+    shell_puts("  process  : ps kill spawn proctest", VGA_COLOR_LIGHT_GREY);
     shell_puts("  env      : env export unset", VGA_COLOR_LIGHT_GREY);
     shell_puts("  math     : calc", VGA_COLOR_LIGHT_GREY);
     shell_puts("  display  : color", VGA_COLOR_LIGHT_GREY);
@@ -539,8 +540,92 @@ static void cmd_top(void)
 
 static void cmd_ps(void)
 {
-    shell_puts("  PID  STATE    NAME", VGA_COLOR_LIGHT_GREY); shell_newline();
-    shell_puts("  1    running  shell", VGA_COLOR_WHITE); shell_newline();
+    shell_puts("  PID  PPID  STATE     NAME", VGA_COLOR_LIGHT_GREY);
+    shell_newline();
+
+    static const char *state_names[] = {
+        "unused  ", "ready   ", "running ",
+        "sleeping", "dead    ", "zombie  "
+    };
+
+    int found = 0;
+    for (int i = 0; i < PROC_MAX; i++) {
+        process_t *p = proc_table_get(i);
+        if (!p || p->state == PROC_UNUSED) continue;
+
+        char line[64]; int j = 0;
+        line[j++] = ' '; line[j++] = ' ';
+        u32 pid = p->pid;
+        char tmp[8]; int ti = 6; tmp[7] = '\0';
+        if (!pid) { tmp[ti--] = '0'; }
+        else { while (pid) { tmp[ti--] = '0' + pid % 10; pid /= 10; } }
+        const char *tp = &tmp[ti+1]; while (*tp) line[j++] = *tp++;
+        /* pad to 6**/
+        while (j < 6) line[j++] = ' ';
+        /*PPID */
+        u32 ppid = p->parent_pid;
+        ti = 6; memset(tmp, ' ', 7); tmp[7] = '\0';
+        if (!ppid) { tmp[ti--] = '0'; }
+        else { while (ppid) { tmp[ti--] = '0' + ppid % 10; ppid /= 10; } }
+        tp = &tmp[ti+1]; while (*tp) line[j++] = *tp++;
+        while (j < 12) line[j++] = ' ';
+        u8 st = (u8)p->state;
+        if (st > 5) st = 4;
+        const char *sn = state_names[st];
+        while (*sn) line[j++] = *sn++;
+        line[j++] = ' ';
+        const char *nm = p->name;
+        while (*nm && j < 63) line[j++] = *nm++;
+        line[j] = '\0';
+        shell_puts(line, VGA_COLOR_WHITE);
+        shell_newline();
+        found++;
+    }
+    if (!found) {
+        shell_puts("  (no processes)", VGA_COLOR_LIGHT_GREY);
+        shell_newline();
+    }
+}
+
+static void cmd_proctest(void)
+{
+    shell_puts("process table:", VGA_COLOR_YELLOW);
+    shell_newline();
+    int active = 0;
+    for (int i = 0; i < PROC_MAX; i++) {
+        process_t *p = proc_table_get(i);
+        if (!p || p->state == PROC_UNUSED) continue;
+        char buf[48]; int j = 0;
+        const char *pre = "  pid="; while (*pre) buf[j++] = *pre++;
+        u32 pid = p->pid;
+        char tmp[8]; int ti = 6; tmp[7]='\0';
+        if (!pid){tmp[ti--]='0';}
+        else{while(pid){tmp[ti--]='0'+pid%10;pid/=10;}}
+        const char *tp=&tmp[ti+1]; while(*tp) buf[j++]=*tp++;
+        const char *nm=" name="; while(*nm) buf[j++]=*nm++;
+        const char *n=p->name; while(*n&&j<46) buf[j++]=*n++;
+        buf[j]='\0';
+        shell_puts(buf, VGA_COLOR_WHITE);
+        shell_newline();
+        active++;
+    }
+    char cbuf[32]; 
+    int ci=0;
+    const char *cp="active: "; 
+    while(*cp) cbuf[ci++]=*cp++;
+    u32 a=(u32)active;
+    char tmp2[8]; 
+    int ti2=6;  tmp2[7]='\0';
+    if(!a){tmp2[ti2--]='0';}
+    else{
+        while(a){
+            tmp2[ti2--]='0'+a%10;a/=10; }
+    }
+    const char *tp2=&tmp2[ti2+1]; 
+    while(*tp2) cbuf[ci++]=*tp2++;
+    cbuf[ci]='\0';
+    shell_puts(cbuf, VGA_COLOR_LIGHT_CYAN);
+    shell_newline();
 }
 
 static void cmd_kill(u32 pid, int sig)
@@ -1428,6 +1513,8 @@ static void dispatch(void)
     if (!streq(cmd_buf,"whoami"))   { cmd_whoami();  return; }
     if (!streq(cmd_buf,"hostname")) { cmd_hostname();return; }
     if (!streq(cmd_buf,"uname"))    { cmd_uname();   return; }
+    if (!streq(cmd_buf,"proctest")) { cmd_proctest(); return; }
+    if (!streq(cmd_buf,"ps"))       { cmd_ps();       return; }
 
     if (!streq(cmd_buf, "poweroff")) { cmd_poweroff(); return; }
 
@@ -1523,7 +1610,6 @@ static void dispatch(void)
 
 void shell_init(void)
 {
-    shell_splash();
     vga_clear();
 
     cmd_len=0; cursor_pos=0;
