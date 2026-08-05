@@ -354,7 +354,7 @@ static void tab_complete(void)
         "touch","rm","mv","cp","wc","head","tail","netinfo","arp","ping",
         "udpsend", "date","whoami","hostname","uname", "sort","uniq",
         "proctest",
-        "edit","shoot","about","reboot","halt", NULL
+        "edit","shoot","about","reboot","halt", "poweroff", NULL
     };
     cmd_buf[cmd_len] = '\0';
     const char *match = NULL;
@@ -677,7 +677,8 @@ static void cmd_pwd(void)  { shell_puts(cwd, VGA_COLOR_WHITE); shell_newline(); 
 
 static void cmd_cd(const char *path)
 {
-    if (!path||!*path) { strncpy(cwd,"/",VFS_PATH_MAX); draw_status(); return; }
+    if (!path||!*path) { strncpy(cwd,"/",VFS_PATH_MAX); draw_status(); shell_puts(cwd, VGA_COLOR_WHITE);
+        shell_newline(); return; }
 
     /* cd - goes back to previous dir */
     if (path[0] == '-' && path[1] == '\0') {
@@ -782,7 +783,7 @@ static void cmd_rm(const char *name)
     rd_t *rd = (rd_t *)parent->inode;
     if (!rd) { shell_puts("rm: bad dir", VGA_COLOR_LIGHT_RED); shell_newline(); return; }
     for (u32 i = 0; i < rd->cnt; i++) {
-        if (!streq(rd->ch[i]->name, name)) {
+        if (streq(rd->ch[i]->name, name) == 0) {
             if (rd->ch[i]->flags & VFS_DIR) {
                 shell_puts("rm: is a directory", VGA_COLOR_LIGHT_RED); shell_newline(); return;
             }
@@ -881,7 +882,7 @@ static void find_recurse(vfs_node_t *dir, const char *name, const char *path, in
         usize plen=strlen(cpath);
         if (plen<VFS_PATH_MAX-2&&cpath[plen-1]!='/'){cpath[plen++]='/';cpath[plen]='\0';}
         strncpy(cpath+plen,child->name,VFS_PATH_MAX-plen-1);
-        if (!streq(child->name,name)){shell_puts(cpath,VGA_COLOR_LIGHT_GREEN);shell_newline();(*found)++;}
+        if (streq(child->name,name) == 0){shell_puts(cpath,VGA_COLOR_LIGHT_GREEN);shell_newline();(*found)++;}
         if (child->flags&VFS_DIR) find_recurse(child,name,cpath,found);
     }
 }
