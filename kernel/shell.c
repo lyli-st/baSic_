@@ -59,6 +59,7 @@ static int  shell_row     = TERM_TOP;
 static void shell_newline(void);   
 static void shell_exec_line(char *line);
 static void dispatch(void);
+static void cmd_ps(void);
 
 static int streq(const char *a, const char *b)
 {
@@ -524,8 +525,7 @@ static void cmd_dmesg(void) { klog_dump(); shell_newline(); }
 static void cmd_top(void)
 {
     shell_puts("PROCESSES:", VGA_COLOR_YELLOW); shell_newline();
-    shell_puts("  PID  STATE    NAME",        VGA_COLOR_LIGHT_GREY); shell_newline();
-    shell_puts("  1    running  shell",        VGA_COLOR_WHITE); shell_newline();
+    cmd_ps();
     shell_newline();
     shell_puts("KERNEL PROFILER:", VGA_COLOR_YELLOW); shell_newline();
     prof_dump();
@@ -1486,8 +1486,6 @@ static void dispatch(void)
             return;
         }
     }
-    draw_status();   
-    watchdog_kick();
 
     if (!streq(cmd_buf,"help"))     { cmd_help();    return; }
     if (!streq(cmd_buf,"clear"))    { cmd_clear();   return; }
@@ -1515,7 +1513,6 @@ static void dispatch(void)
     if (!streq(cmd_buf,"hostname")) { cmd_hostname();return; }
     if (!streq(cmd_buf,"uname"))    { cmd_uname();   return; }
     if (!streq(cmd_buf,"proctest")) { cmd_proctest(); return; }
-    if (!streq(cmd_buf,"ps"))       { cmd_ps();       return; }
 
     if (!streq(cmd_buf, "poweroff")) { cmd_poweroff(); return; }
 
