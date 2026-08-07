@@ -1,6 +1,14 @@
 ; baSic_ - boot/boot.asm
 ; Copyright (C) 2026 Dhrubo
 ; GPL v2 — see LICENSE
+
+%if 0
+    MBR bootloader — loads stage2+kernel into 0x8000 via INT 13h AH=42h
+    real hardware bug fixed here:
+    single large DAP reads silently short read on real BIOSes without
+    setting CF. QEMU tolerated 128 sectors in one call; Dell BIOS did not.
+    * fix: chunked 32-sector reads with 3 retries each.
+%endif
 [BITS 16]
 [ORG 0x7C00]
 
@@ -28,23 +36,7 @@ start:
     ; hand off to stage2
     jmp KERNEL_LOAD_ADDR
 
-; load_kernel: loads TOTAL_SECTORS sectors starting at LBA 1 into
-;              physical address KERNEL_LOAD_ADDR, in CHUNK_SECTORS
-;              chunks, verifying CF after every single chunk.
-;
-; Root cause this replaces: a single INT 13h AH=42h call is not
-; guaranteed to transfer an arbitrary sector count on real BIOSes —
-; some silently short-read without setting CF. QEMU's SeaBIOS
-; tolerated 128 sectors in one call; real hardware did not. Confirmed
-; by objdump: .rodata/.data landed entirely inside the old 128-sector
-; read, explaining the truncated "baSic_" hostname string and the
-; dead command table on real HW.
-;
-; Fix: read in small fixed-size chunks, check CF after every chunk,
-; and advance the destination as a paragraph-aligned segment:0 pair
-; (not offset += N) so we never silently wrap a 16-bit offset at a
-; 64KB boundary either — sector-aligned addresses are always multiples
-; of 16, so segment = physical >> 4, offset = 0 is always exact.
+; chunked read: 32 sectors at a time, 3 retries per chunk
 load_kernel:
     mov dword [cur_lba], 1                 ; starting LBA (sector 2, 0-indexed=1)
     mov dword [cur_phys], KERNEL_LOAD_ADDR
